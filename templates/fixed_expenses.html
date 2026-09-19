@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <form method="get" class="inline-form inline-form-end">
+    <label>
+      <span>Mes</span>
+      <select name="month" onchange="this.form.submit()">
+        {% for option in month_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="hero-grid hero-grid-bank">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Seguimiento de gastos fijos</p>
+    <h3>{{ fixed.expected_total | money }}</h3>
+    <p class="hero-meta">
+      Real del mes: <strong>{{ fixed.actual_total | money }}</strong>
+      <span class="tag {{ fixed.status_tone }}">
+        {% if fixed.variance_total <= 0 %}Dentro de lo esperado{% else %}Por encima de lo esperado{% endif %}
+      </span>
+    </p>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Diferencia</span>
+        <strong class="{% if fixed.variance_total <= 0 %}value-positive{% else %}value-negative{% endif %}">{{ fixed.variance_total | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Reglas activas</span>
+        <strong>{{ recurring_expenses | length }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Cobertura</span>
+        <strong>{{ fixed.coverage_percent }}%</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Sin detectar</p>
+    <strong>{{ fixed.missing_rules | length }}</strong>
+    <span>Reglas activas sin movimiento</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Sin regla</p>
+    <strong>{{ fixed.uncovered_fixed | length }}</strong>
+    <span>Cargos fijos no cubiertos</span>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="surface-note">
+      <p><strong>Lectura.</strong> Esta pantalla lista compromisos recurrentes. La categoría real indica para qué sirve cada gasto en los informes; por ejemplo, una suscripción profesional puede seguir aquí como gasto fijo y contar como reinversión.</p>
+    </div>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Nueva regla</p>
+        <h3>Configurar gasto recurrente</h3>
+      </div>
+    </div>
+
+    <form method="post" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <input type="hidden" name="category_code" value="fixed_expense">
+
+      <label>
+        <span>Nombre</span>
+        <input type="text" name="name" placeholder="Alquiler, seguro, suscripción profesional" required>
+      </label>
+
+      <div class="form-grid">
+        <label>
+          <span>Modo</span>
+          <select name="amount_mode">
+            {% for option in amount_mode_options %}
+              <option value="{{ option.value }}">{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Importe</span>
+          <input type="number" step="0.01" name="amount" required>
+        </label>
+        <label>
+          <span>Cantidad por defecto</span>
+          <input type="number" step="0.01" name="default_quantity" placeholder="Opcional">
+        </label>
+      </div>
+
+      <label>
+        <span>Patrones para detectar movimientos</span>
+        <input type="text" name="match_pattern" placeholder="Ejemplo: alquiler, internet, seguro">
+      </label>
+
+      <label>
+        <span>Categoria real / naturaleza</span>
+        <select name="reporting_category_code">
+          {% for option in reporting_category_options %}
+            <option value="{{ option.code }}" {% if option.code == 'other' %}selected{% endif %}>{{ option.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        <span>Notas</span>
+        <textarea name="notes" rows="3"></textarea>
+      </label>
+
+      <button type="submit" class="primary-button">Guardar regla</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Alertas</p>
+        <h3>Lo que conviene revisar</h3>
+      </div>
+    </div>
+
+    <div class="alert-list">
+      {% for alert in fixed.alerts %}
+        <article class="alert-item alert-item-{{ alert.tone }}">
+          <div class="text-stack">
+            <strong>{{ alert.title }}</strong>
+            <p>{{ alert.detail }}</p>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin alertas relevantes</strong>
+          <p>La lectura de tus gastos fijos esta bastante limpia este mes.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if fixed.missing_rules %}
+      <div class="section-divider"></div>
+      <div class="mini-list">
+        {% for row in fixed.missing_rules %}
+          <article class="mini-list-item">
+            <div class="text-stack">
+              <strong>{{ row.name }}</strong>
+              <p>{{ row.amount_mode_label }} · esperado {{ row.estimated_amount | money }}</p>
+              <small>{{ row.reporting_category_name }}</small>
+            </div>
+            <span class="tag warning">No aparece</span>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Reglas activas</p>
+        <h3>Seguimiento real vs esperado</h3>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Regla</th>
+            <th>Modo</th>
+            <th>Categoria real</th>
+            <th>Esperado</th>
+            <th>Real</th>
+            <th>Movimientos</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in recurring_expenses %}
+            <tr>
+              <td>
+                <strong>{{ row.name }}</strong>
+                {% if row.match_pattern %}
+                  <small>{{ row.match_pattern }}</small>
+                {% endif %}
+              </td>
+              <td>{{ row.amount_mode_label }}</td>
+              <td><span class="tag muted">{{ row.reporting_category_name }}</span></td>
+              <td>{{ row.estimated_amount | money }}</td>
+              <td>{{ row.actual_amount | money }}</td>
+              <td>
+                {{ row.matched_count }}
+                {% if row.last_match_date %}
+                  <small>{{ row.last_match_date | compact_date }}</small>
+                {% endif %}
+              </td>
+              <td><span class="tag {{ row.status_tone }}">{{ row.status_label }}</span></td>
+              <td>
+                <div class="action-stack">
+                  <form method="post" action="{{ url_for('web.fixed_expenses_toggle', expense_id=row.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <button type="submit" class="text-link">{{ "Desactivar" if row.active else "Activar" }}</button>
+                  </form>
+                  <form method="post" action="{{ url_for('web.fixed_expenses_delete', expense_id=row.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <button type="submit" class="text-link">Eliminar</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8">No hay reglas guardadas todavia.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Detectados sin regla</p>
+        <h3>Cargos fijos a cubrir mejor</h3>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in fixed.uncovered_fixed %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }}</p>
+          </div>
+          <strong>{{ row.amount | money }}</strong>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Todo cubierto</strong>
+          <p>No hay cargos fijos del mes fuera de tus reglas actuales.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if fixed.repeated_candidates %}
+      <div class="section-divider"></div>
+      <div class="mini-list">
+        {% for row in fixed.repeated_candidates %}
+          <article class="mini-list-item">
+            <div class="text-stack">
+              <strong>{{ row.description }}</strong>
+              <p>Se repite {{ row.count }} veces en {{ row.months | length }} meses.</p>
+            </div>
+            <strong>{{ row.amount | money }}</strong>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Movimientos asociados</p>
+        <h3>Gastos fijos reales del mes</h3>
+      </div>
+    </div>
+
+    <div class="timeline-list">
+      {% for row in recent_fixed_transactions %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ row.description }}</strong>
+            <p>
+              {{ row.transaction_date | compact_date }}
+              {% if row.recurring_name %}
+                · {{ row.recurring_name }}
+              {% else %}
+                · sin regla
+              {% endif %}
+              · {{ row.reporting_category_name }}
+            </p>
+          </div>
+          <div class="timeline-meta">
+            <strong>{{ row.amount | money }}</strong>
+            <small>{{ row.review_status }}</small>
+          </div>
+        </article>
+      {% else %}
+        <p class="muted-copy">Todavia no hay movimientos asociados a reglas recurrentes o clasificados como gasto fijo este mes.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <form method="get" class="inline-form inline-form-end">
+    <label>
+      <span>Mes</span>
+      <select name="month" onchange="this.form.submit()">
+        {% for option in month_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="hero-grid hero-grid-bank">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Presupuesto de {{ budget.month_label }}</p>
+    <h3>{{ budget.budget_salary | money }}</h3>
+    <p class="hero-meta">Libre previsto: <strong>{{ budget.remaining_plan | money }}</strong> · Sobrante pendiente: <strong>{{ budget.savings_metrics.pending_assignment | money }}</strong> · Colchon real separado del mes</p>
+  </article>
+  <article class="metric-card">
+    <p>Nomina detectada</p>
+    <strong>{{ budget.detected_salary | money }}</strong>
+  </article>
+  <article class="metric-card">
+    <p>Asignacion prevista</p>
+    <strong>{{ budget.planned_assignment_percent }}%</strong>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="surface-note">
+      <p><strong>Nota de lectura.</strong> El objetivo de ahorro es el ahorro automatico / planificado. El real de esa fila sigue siendo ahorro movido; el sobrante del mes es dinero pendiente de asignar y no aumenta el colchon real automaticamente.</p>
+      <p class="muted-copy">Gasto fijo es una lectura estructural por recurrencia. Reinversion, vivir y otras categorias son lecturas reales del gasto, asi que una regla recurrente puede aparecer como fija y tambien en su naturaleza real.</p>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Seguimiento</p>
+        <h3>Planificado vs real</h3>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Bloque</th>
+            <th>Objetivo</th>
+            <th>Real / movido</th>
+            <th>Desviacion</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in budget.allocation_rows %}
+            <tr>
+              <td>
+                {{ row.label }}
+                {% if row.code == 'savings' %}
+                  <small class="muted-copy">La cifra real aqui es ahorro movido.</small>
+                {% endif %}
+              </td>
+              <td>{{ row.target_amount | money }}</td>
+              <td>{{ row.actual_amount | money }}</td>
+              <td class="{% if row.variance_amount <= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.variance_amount | money }}</td>
+              <td><span class="tag {{ row.status }}">{{ row.status }}</span></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="hero-grid hero-grid-summary">
+  <article class="metric-card">
+    <p>Ahorro automatico objetivo</p>
+    <strong>{{ budget.savings_metrics.ahorro_automatico_target | money }}</strong>
+    <span>Planificado en el presupuesto</span>
+  </article>
+  <article class="metric-card">
+    <p>Ahorro movido</p>
+    <strong>{{ budget.savings_metrics.moved_actual | money }}</strong>
+    <span>{{ budget.savings_metrics.progreso_ahorro_automatico }}% del objetivo</span>
+  </article>
+  <article class="metric-card">
+    <p>Sobrante del mes</p>
+    <strong class="{% if budget.savings_metrics.pending_assignment >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ budget.savings_metrics.pending_assignment | money }}</strong>
+    <span>Pendiente de asignar</span>
+  </article>
+  <article class="metric-card">
+    <p>Capacidad vs automatico</p>
+    <strong class="{% if budget.savings_metrics.capacity_difference_vs_target >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ budget.savings_metrics.capacity_difference_vs_target | money }}</strong>
+    <span>{{ budget.savings_metrics.comparison_copy }}</span>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Base mensual</p>
+        <h3>Nomina y reglas del mes</h3>
+      </div>
+    </div>
+    <form method="post" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <input type="hidden" name="action" value="save_salary">
+
+      <label>
+        <span>Nomina esperada</span>
+        <input type="number" step="0.01" name="expected_amount" value="{{ budget.salary_entry.expected_amount if budget.salary_entry else '' }}">
+      </label>
+
+      <label>
+        <span>Nomina real</span>
+        <input type="number" step="0.01" name="actual_amount" value="{{ budget.salary_entry.actual_amount if budget.salary_entry else '' }}">
+      </label>
+
+      <label>
+        <span>Fecha de cobro</span>
+        <input type="date" name="received_date" value="{{ budget.salary_entry.received_date if budget.salary_entry else '' }}">
+      </label>
+
+      <label>
+        <span>Notas</span>
+        <textarea name="notes" rows="3">{{ budget.salary_entry.notes if budget.salary_entry else '' }}</textarea>
+      </label>
+
+      <button type="submit" class="primary-button">Guardar nomina</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Distribucion</p>
+        <h3>Porcentajes y supuestos</h3>
+      </div>
+    </div>
+    <form method="post" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <input type="hidden" name="action" value="save_budget">
+
+      <div class="form-grid">
+        <label>
+          <span>% inversion</span>
+          <input type="number" step="0.1" name="investment_percent" value="{{ budget.effective_rule.investment_percent }}">
+        </label>
+        <label>
+          <span>% reinversión</span>
+          <input type="number" step="0.1" name="reinvestment_percent" value="{{ budget.effective_rule.reinvestment_percent }}">
+        </label>
+        <label>
+          <span>% ahorro automatico</span>
+          <input type="number" step="0.1" name="savings_percent" value="{{ budget.effective_rule.savings_percent }}">
+        </label>
+        <label>
+          <span>% variable general</span>
+          <input type="number" step="0.1" name="lifestyle_percent" value="{{ budget.effective_rule.lifestyle_percent }}">
+        </label>
+        <label>
+          <span>% excepcionales</span>
+          <input type="number" step="0.1" name="exceptional_percent" value="{{ budget.effective_rule.exceptional_percent }}">
+        </label>
+        <label>
+          <span>Dias trabajados estimados</span>
+          <input type="number" step="1" name="estimated_workdays" value="{{ budget.workdays }}">
+        </label>
+        <label>
+          <span>Override gasto fijo</span>
+          <input type="number" step="0.01" name="fixed_expenses_override" value="{{ budget.effective_rule.fixed_expenses_override if budget.effective_rule.fixed_expenses_override is not none else '' }}">
+        </label>
+      </div>
+
+      <label>
+        <span>Notas del mes</span>
+        <textarea name="notes" rows="3">{{ budget.effective_rule.notes }}</textarea>
+      </label>
+
+      <button type="submit" class="primary-button">Guardar presupuesto</button>
+    </form>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Bolsas virtuales</p>
+        <h3>Remanente acumulado dentro del banco</h3>
+      </div>
+      <span class="tag muted">No mueve dinero real</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Categoria flexible</th>
+            <th>Remanente anterior</th>
+            <th>Presupuesto del mes</th>
+            <th>Gasto del mes</th>
+            <th>Consumido de bolsa</th>
+            <th>Saldo virtual actual</th>
+            <th>Lectura</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in budget.bank_subbalances.rows %}
+            <tr>
+              <td>
+                <strong>{{ row.category_name }}</strong>
+                <small>Bolsa virtual bancaria</small>
+              </td>
+              <td>{{ row.opening_balance | money }}</td>
+              <td>{{ row.monthly_budget_amount | money }}</td>
+              <td>{{ row.monthly_spent_amount | money }}</td>
+              <td>{{ row.rollover_consumed_amount | money }}</td>
+              <td>{{ row.closing_balance | money }}</td>
+              <td>
+                <span class="tag {{ row.tone }}">{{ row.status_label }}</span>
+                <small>{{ row.helper }}</small>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="surface-caption">Solo acumulan Variable general, Excepcionales y Reinversion. Gasto fijo, ahorro e inversion no generan bolsa virtual.</p>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Gastos fijos</p>
+        <h3>Estimacion mensual</h3>
+      </div>
+    </div>
+    <div class="timeline-list">
+      {% for row in budget.recurring_expenses %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ row.name }}</strong>
+            <p>{{ row.amount_mode_label }} - {{ row.amount | money }} - {{ row.reporting_category_name }}</p>
+          </div>
+          <div class="timeline-meta">
+            <strong>{{ row.estimated_amount | money }}</strong>
+            <small>Real {{ row.actual_amount | money }}</small>
+          </div>
+        </article>
+      {% else %}
+        <p class="muted-copy">Todavia no hay reglas recurrentes creadas para calcular gastos fijos.</p>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Ajustes manuales</p>
+        <h3>Corregir el mes</h3>
+      </div>
+    </div>
+    <form method="post" class="stacked-form compact-card">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <input type="hidden" name="action" value="add_adjustment">
+
+      <label>
+        <span>Bloque</span>
+        <select name="bucket_code" required>
+          {% for option in allocation_bucket_options %}
+            <option value="{{ option.value }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        <span>Importe</span>
+        <input type="number" step="0.01" name="amount" required>
+      </label>
+
+      <label>
+        <span>Notas</span>
+        <textarea name="notes" rows="2"></textarea>
+      </label>
+
+      <button type="submit" class="primary-button">Anadir ajuste</button>
+    </form>
+
+    <div class="timeline-list">
+      {% for row in manual_adjustments %}
+        <article class="timeline-item">
+          <div>
+            <strong>{% if row.bucket_code == 'savings' %}Ahorro automatico / planificado{% else %}{{ PERSONAL_CATEGORY_MAP[row.bucket_code].name }}{% endif %}</strong>
+            <p>{{ row.notes or "Sin nota" }}</p>
+          </div>
+          <div class="timeline-meta">
+            <strong>{{ row.amount | money }}</strong>
+            <form method="post" action="{{ url_for('web.budget_delete_adjustment', adjustment_id=row.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="month" value="{{ selected_month }}">
+              <button type="submit" class="text-link">Eliminar</button>
+            </form>
+          </div>
+        </article>
+      {% else %}
+        <p class="muted-copy">No hay ajustes manuales para este mes.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero-grid hero-grid-cash">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Caja real</p>
+    <h3>{{ cash.total | money }}</h3>
+    <p class="hero-meta">El saldo real del efectivo sale del inventario de billetes, no del historial.</p>
+
+    <div class="pill-row">
+      <span class="tag muted">{{ cash.total_notes }} billetes</span>
+      <span class="tag muted">{{ cash.active_denominations }} denominaciones activas</span>
+      {% if cash.last_movement_date %}
+        <span class="tag success">Ultimo movimiento {{ cash.last_movement_date | compact_date }}</span>
+      {% else %}
+        <span class="tag warning">Sin movimientos aun</span>
+      {% endif %}
+    </div>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Total efectivo</span>
+        <strong>{{ cash.total | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Billetes</span>
+        <strong>{{ cash.total_notes }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Tipos activos</span>
+        <strong>{{ cash.active_denominations }}</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Inventario</p>
+    <strong>{{ cash.total_notes }}</strong>
+    <span>Billetes ahora mismo</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Denominaciones</p>
+    <strong>{{ cash.active_denominations }}</strong>
+    <span>Tipos distintos en caja</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Ultimo cambio</p>
+    <strong>
+      {% if cash.last_movement %}
+        {{ cash.last_movement.signed_amount | money }}
+      {% else %}
+        N/D
+      {% endif %}
+    </strong>
+    <span>
+      {% if cash.last_movement %}
+        {{ cash.last_movement.movement_date | compact_date }}
+      {% else %}
+        Sin historial todavia
+      {% endif %}
+    </span>
+  </article>
+  <article class="metric-card">
+    <p>Cuadre</p>
+    <strong>Activo</strong>
+    <span>El inventario manda sobre el saldo</span>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Inventario</p>
+        <h3>Billetes disponibles</h3>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in inventory_rows %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.label }}</strong>
+            <p>{{ row.quantity }} billetes</p>
+          </div>
+          <div class="mini-list-side">
+            <strong>{{ row.subtotal | money }}</strong>
+            <small>{{ row.quantity }} x {{ row.label }}</small>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Caja vacia</strong>
+          <p>Aun no has registrado billetes en el inventario.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Movimiento rapido</p>
+        <h3>Anadir o quitar billetes</h3>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('web.cash_movement') }}" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="form-grid">
+        <label>
+          <span>Fecha</span>
+          <input type="date" name="movement_date" value="{{ default_date }}">
+        </label>
+
+        <label>
+          <span>Denominacion</span>
+          <select name="denomination" required>
+            {% for option in denomination_options %}
+              <option value="{{ option.value }}">{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <span>Cantidad</span>
+          <input type="number" name="quantity" min="1" step="1" value="1" required>
+        </label>
+
+        <label>
+          <span>Descripcion</span>
+          <input type="text" name="description" placeholder="Ej. regalo, cobro, gasto en mano">
+        </label>
+      </div>
+
+      <div class="action-row">
+        <button type="submit" name="operation" value="in" class="primary-button">Anadir billetes</button>
+        <button type="submit" name="operation" value="out" class="ghost-button">Quitar billetes</button>
+      </div>
+    </form>
+
+    <div class="surface-note">
+      <p><strong>Validacion activa.</strong> Si intentas quitar mas billetes de los que hay, la app bloquea la operacion.</p>
+      <p class="muted-copy">El historial guarda la trazabilidad y el inventario mantiene el saldo real.</p>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Historial</p>
+        <h3>Movimientos recientes</h3>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in recent_movements %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>
+              {{ row.movement_date | compact_date }}
+              {% if row.detail %}
+                · {{ row.detail }}
+              {% else %}
+                · ajuste manual
+              {% endif %}
+            </p>
+          </div>
+          <div class="mini-list-side">
+            <span class="tag {% if row.direction == 'in' %}success{% else %}warning{% endif %}">{{ row.direction_label }}</span>
+            <strong class="{% if row.direction == 'in' %}value-positive{% else %}value-negative{% endif %}">{{ row.signed_amount | money }}</strong>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin historial todavia</strong>
+          <p>Los proximos movimientos de efectivo apareceran aqui.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Recontar</p>
+        <h3>Ajuste manual del inventario</h3>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('web.cash_recount') }}" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="form-grid">
+        <label>
+          <span>Fecha del recuento</span>
+          <input type="date" name="movement_date" value="{{ default_date }}">
+        </label>
+
+        <label>
+          <span>Descripcion</span>
+          <input type="text" name="description" value="Recuento manual de efectivo">
+        </label>
+      </div>
+
+      <div class="cash-recount-grid">
+        {% for row in recount_rows %}
+          <label>
+            <span>{{ row.label }}</span>
+            <input type="number" name="qty_{{ row.denomination }}" min="0" step="1" value="{{ row.quantity }}">
+          </label>
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="ghost-button">Guardar recuento</button>
+    </form>
+
+    <div class="surface-note">
+      <p><strong>Util para cuadrar la caja.</strong> Si te equivocas o haces un recuento real, aqui corriges las cantidades y el saldo vuelve a cuadrar al instante.</p>
+    </div>
+  </article>
+</section>
+{% endblock %}

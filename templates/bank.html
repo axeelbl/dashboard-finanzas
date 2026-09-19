@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <form method="get" class="filter-grid">
+    <label>
+      <span>Mes</span>
+      <select name="month">
+        {% for option in month_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      <span>Categoria</span>
+      <select name="category">
+        <option value="">Todas</option>
+        {% for option in category_options %}
+          <option value="{{ option.code }}" {% if option.code == selected_category %}selected{% endif %}>{{ option.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      <span>Revision</span>
+      <select name="review">
+        <option value="">Todas</option>
+        <option value="pending" {% if selected_review_status == 'pending' %}selected{% endif %}>Pendientes</option>
+        <option value="auto" {% if selected_review_status == 'auto' %}selected{% endif %}>Auto</option>
+        <option value="manual" {% if selected_review_status == 'manual' %}selected{% endif %}>Manual</option>
+      </select>
+    </label>
+
+    <label>
+      <span>Buscar</span>
+      <input type="text" name="search" value="{{ search_query }}" placeholder="Concepto o comercio">
+    </label>
+
+    <div class="filter-actions">
+      <button type="submit" class="primary-button">Aplicar filtros</button>
+      <a href="{{ url_for('web.bank', month=selected_month) }}" class="ghost-button">Limpiar</a>
+    </div>
+  </form>
+</section>
+
+<section class="hero-grid hero-grid-summary">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Control de movimientos</p>
+    <h3>{{ selected_month | month_name }}</h3>
+    <p class="hero-meta">Entradas {{ inflows | money }} · Salidas {{ outflows | money }}</p>
+
+    <div class="pill-row">
+      <span class="tag warning">{{ pending_total }} pendientes</span>
+      <span class="tag muted">{{ quick_counts.fixed_expense }} fijos</span>
+      <span class="tag muted">{{ quick_counts.food }} comida</span>
+      <span class="tag muted">{{ quick_counts.leisure }} ocio</span>
+      <span class="tag muted">{{ quick_counts.transport }} transporte</span>
+      <span class="tag muted">{{ quick_counts.health }} salud</span>
+      <span class="tag muted">{{ quick_counts.shopping }} compras</span>
+      <span class="tag muted">{{ quick_counts.investment }} inversion</span>
+      <span class="tag muted">{{ quick_counts.reinvestment }} reinversión</span>
+      <span class="tag muted">{{ quick_counts.savings }} ahorro</span>
+    </div>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Gasto variable</span>
+        <strong>{{ budget.variable_spend | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Gasto fijo</span>
+        <strong>{{ budget.actuals.fixed_expense | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Reinversión</span>
+        <strong>{{ budget.actuals.reinvestment | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Sobrante</span>
+        <strong class="{% if budget.savings_metrics.pending_assignment >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ budget.savings_metrics.pending_assignment | money }}</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Pendientes</p>
+    <strong>{{ pending_total }}</strong>
+    <span>Prioridad de revision</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Inversion</p>
+    <strong>{{ quick_counts.investment }}</strong>
+    <span>Movimientos marcados</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Reinversión</p>
+    <strong>{{ quick_counts.reinvestment }}</strong>
+    <span>Herramientas y crecimiento</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Ahorro</p>
+    <strong>{{ quick_counts.savings }}</strong>
+    <span>Movimientos marcados</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Gastos fijos</p>
+    <strong>{{ quick_counts.fixed_expense }}</strong>
+    <span>Movimientos detectados</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Salida total</p>
+    <strong>{{ outflows | money }}</strong>
+    <span>Todo lo que ha salido este mes</span>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Revision</p>
+        <h3>Cola de pendientes</h3>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in pending_rows %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }}</p>
+          </div>
+          <strong class="{% if row.amount >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.amount | money }}</strong>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>No hay pendientes</strong>
+          <p>Todo lo de este mes esta clasificado o revisado.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Salidas del mes</p>
+        <h3>Por categoria</h3>
+      </div>
+    </div>
+
+    <canvas class="chart-canvas donut-chart" data-chart-type="donut" data-chart='{{ spending_chart | tojson }}'></canvas>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Movimientos</p>
+        <h3>Revision rapida y reclasificacion</h3>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table data-table-forms">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th>Importe</th>
+            <th>Categoria</th>
+            <th>Revision</th>
+            <th>Guardar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in transactions %}
+            <tr class="{% if row.is_pending %}row-pending{% elif row.is_investment %}row-investment{% elif row.is_reinvestment %}row-reinvestment{% elif row.is_savings %}row-savings{% elif row.is_fixed_structural %}row-fixed{% endif %}">
+              <td>{{ row.transaction_date | compact_date }}</td>
+              <td>
+                <strong>{{ row.description }}</strong>
+                <div class="pill-row pill-row-compact">
+                  {% if row.is_pending %}
+                    <span class="tag warning">Pendiente</span>
+                  {% endif %}
+                  {% if row.is_investment %}
+                    <span class="tag processing">Inversion</span>
+                  {% endif %}
+                  {% if row.is_reinvestment %}
+                    <span class="tag success">Reinversión</span>
+                  {% endif %}
+                  {% if row.is_savings %}
+                    <span class="tag success">Ahorro</span>
+                  {% endif %}
+                  {% if row.is_fixed_structural %}
+                    <span class="tag muted">Gasto fijo</span>
+                  {% endif %}
+                  {% if row.recurring_name %}
+                    <span class="tag muted">Regla: {{ row.recurring_name }}</span>
+                  {% endif %}
+                </div>
+                {% if row.review_notes %}
+                  <small>{{ row.review_notes }}</small>
+                {% endif %}
+              </td>
+              <td class="{% if row.amount >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.amount | money }}</td>
+              <td colspan="3">
+                <form method="post" action="{{ url_for('web.update_bank_transaction_category', transaction_id=row.id) }}" class="table-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="month" value="{{ selected_month }}">
+                  <input type="hidden" name="category_filter" value="{{ filters.category }}">
+                  <input type="hidden" name="review_filter" value="{{ filters.review }}">
+                  <input type="hidden" name="search_filter" value="{{ filters.search }}">
+
+                  <select name="category_code" required>
+                    {% for option in category_options %}
+                      <option value="{{ option.code }}" {% if option.code == row.category_code %}selected{% endif %}>{{ option.name }}</option>
+                    {% endfor %}
+                  </select>
+
+                  <label class="checkbox-inline">
+                    <input type="checkbox" name="is_fixed_expense" value="1" {% if row.is_fixed_structural %}checked{% endif %}>
+                    <span>Gasto fijo</span>
+                  </label>
+
+                  <input type="text" name="review_notes" value="{{ row.review_notes or '' }}" placeholder="Nota opcional">
+
+                  <span class="tag {% if row.review_status == 'manual' %}success{% elif row.review_status == 'auto' %}processing{% else %}warning{% endif %}">
+                    {{ row.review_status or "pendiente" }}
+                  </span>
+
+                  <button type="submit" class="ghost-button">Guardar</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6">No hay movimientos con los filtros actuales.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+{% endblock %}

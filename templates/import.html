@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero-grid hero-grid-bank">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Importacion manual</p>
+    <h3>CSV, XLSX y PDF locales</h3>
+    <p class="hero-meta">Despues de importar movimientos bancarios, la app intenta clasificar automaticamente cada apunte. Trade Republic tambien acepta su extracto PDF y ahora puedes sumar la via automatica por email.</p>
+  </article>
+  <article class="metric-card">
+    <p>Pendientes de revisar</p>
+    <strong>{{ pending_bank_transactions }}</strong>
+  </article>
+  <article class="metric-card">
+    <p>Accion recomendada</p>
+    <strong><a href="{{ url_for('web.bank', review='pending') }}">Revisar banco</a></strong>
+  </article>
+</section>
+
+<section class="split-grid split-grid-tight">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Carga manual</p>
+        <h3>Subir un archivo</h3>
+      </div>
+    </div>
+    <form method="post" enctype="multipart/form-data" class="import-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <label>
+        <span>Fuente</span>
+        <select name="source" required>
+          <option value="bank">Banco</option>
+          <option value="trade_republic">Trade Republic</option>
+          <option value="binance">Binance</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Fecha snapshot opcional</span>
+        <input type="date" name="snapshot_date">
+      </label>
+
+      <label class="dropzone" data-dropzone>
+        <input type="file" name="import_file" accept=".csv,.xlsx,.xls,.pdf" required>
+        <span class="dropzone-copy">
+          Arrastra aqui el fichero o pulsa para seleccionar.
+          <small>Los duplicados se detectan por hash y por contenido. El PDF esta soportado para Trade Republic.</small>
+        </span>
+      </label>
+
+      <button type="submit" class="primary-button">Procesar importacion</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Plantillas</p>
+        <h3>Formatos recomendados</h3>
+      </div>
+    </div>
+    <div class="template-list">
+      {% for key, profile in profiles.items() %}
+        <article class="template-item">
+          <div>
+            <strong>{{ profile.title }}</strong>
+            <p>{{ profile.description }}</p>
+            <small>Obligatorias: {{ profile.required | join(", ") }}</small>
+            <small>Opcionales: {{ profile.optional | join(", ") }}</small>
+          </div>
+          <a href="{{ url_for('web.download_template', source=key) }}" class="ghost-button">Descargar plantilla</a>
+        </article>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Importacion por email</p>
+        <h3>Entrada automatica sin clicks</h3>
+      </div>
+    </div>
+
+    {% if email_import.enabled %}
+      <div class="stat-chip-row">
+        <div class="stat-chip">
+          <span>Cuenta</span>
+          <strong>{{ email_import.username or "Configurada" }}</strong>
+        </div>
+        <div class="stat-chip">
+          <span>Bandeja</span>
+          <strong>{{ email_import.folder }}</strong>
+        </div>
+        <div class="stat-chip">
+          <span>Procesados</span>
+          <strong>{{ email_import.processed_folder }}</strong>
+        </div>
+        <div class="stat-chip">
+          <span>Error</span>
+          <strong>{{ email_import.error_folder }}</strong>
+        </div>
+      </div>
+      <p class="muted-copy">Reenvia un adjunto con asunto como <strong>[BANK] Extracto abril</strong> y el script `python scripts/run_email_importer.py` lo procesara usando la misma logica que la subida manual. En modo polling revisa el inbox cada {{ email_import.poll_interval }} segundos.</p>
+    {% else %}
+      <div class="empty-state">
+        <strong>Importacion por email desactivada</strong>
+        <p>Configura `EMAIL_ENABLED=true` y las credenciales IMAP en tu `.env` para activar esta via automatica.</p>
+      </div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Jobs</p>
+        <h3>Historial de importaciones</h3>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Fuente</th>
+            <th>Entrada</th>
+            <th>Archivo</th>
+            <th>Asunto email</th>
+            <th>Estado</th>
+            <th>Nuevas</th>
+            <th>Duplicadas</th>
+            <th>Mensaje</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+            <tr>
+              <td>{{ job.imported_at | compact_date }}</td>
+              <td>{{ SOURCE_LABELS[job.source] }}</td>
+              <td><span class="tag muted">{{ job.source_type or "manual" }}</span></td>
+              <td>{{ job.filename }}</td>
+              <td>{{ job.email_subject or "-" }}</td>
+              <td><span class="tag {{ job.status }}">{{ job.status }}</span></td>
+              <td>{{ job.row_count }}</td>
+              <td>{{ job.duplicate_count }}</td>
+              <td>{{ job.message }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+{% endblock %}

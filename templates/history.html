@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero-grid hero-grid-summary">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Historico financiero</p>
+    <h3>{{ highlights.net_worth | money }}</h3>
+    <p class="hero-meta">Lectura desde {{ baseline.date | compact_date }}. Los datos anteriores siguen guardados.</p>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Sobrante reciente</span>
+        <strong class="{% if highlights.latest_pending_assignment >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ highlights.latest_pending_assignment | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Sobrante medio</span>
+        <strong>{{ highlights.average_pending_assignment | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Gasto reciente</span>
+        <strong>{{ highlights.latest_spending | money }}</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Meses visibles</p>
+    <strong>{{ rows | length }}</strong>
+    <span>Resumen mensual consolidado</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Importaciones</p>
+    <strong>{{ imports | length }}</strong>
+    <span>Ultima actividad registrada</span>
+  </article>
+</section>
+
+<section class="toolbar-card">
+  <div class="toolbar-group">
+    <form method="get" action="{{ url_for('web.history') }}" class="inline-form inline-form-end">
+      <label>
+        <span>Ver desde</span>
+        <input type="date" name="start" value="{{ baseline.date }}">
+      </label>
+      <button type="submit" class="primary-button">Aplicar</button>
+    </form>
+
+    {% if not baseline.is_official %}
+      <a href="{{ url_for('web.history') }}" class="ghost-button">Volver al inicio oficial</a>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('web.update_baseline') }}" class="inline-form inline-form-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="baseline_date" value="{{ baseline.date }}">
+      <input type="hidden" name="next" value="{{ url_for('web.history') }}">
+      <button type="submit" class="ghost-button">Guardar como inicio oficial</button>
+    </form>
+  </div>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Desde {{ baseline.date | compact_date }}</p>
+        <h3>Gasto por categoria</h3>
+      </div>
+      <span class="tag muted">{{ global_summary.first_transaction_date | compact_date }} - {{ global_summary.last_transaction_date | compact_date }}</span>
+    </div>
+    <canvas class="chart-canvas donut-chart" data-chart-type="donut" data-chart='{{ global_summary.category_chart | tojson }}'></canvas>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Desde {{ baseline.date | compact_date }}</p>
+        <h3>Totales acumulados</h3>
+      </div>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Ingresos</span>
+        <strong>{{ global_summary.total_income_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Gasto operativo</span>
+        <strong>{{ global_summary.total_expenses_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Inversion</span>
+        <strong>{{ global_summary.total_investment_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Reinversion</span>
+        <strong>{{ global_summary.total_reinvestment_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Ahorro movido</span>
+        <strong>{{ global_summary.total_savings_moved_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Sobrante no asignado</span>
+        <strong class="{% if global_summary.total_pending_assignment_all_time >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ global_summary.total_pending_assignment_all_time | money }}</strong>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Categorias</p>
+        <h3>Resumen desde el inicio visible</h3>
+      </div>
+      <span class="tag muted">{{ global_summary.total_outflows_all_time | money }} en salidas clasificadas</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Total visible</th>
+            <th>% sobre salidas</th>
+            <th>Movimientos</th>
+            <th>Ticket medio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in global_summary.category_rows %}
+            <tr>
+              <td>
+                <span class="category-dot" style="background: {{ row.color }};"></span>
+                {{ row.label }}
+              </td>
+              <td>{{ row.total | money }}</td>
+              <td>{{ row.percent }}%</td>
+              <td>{{ row.tx_count }}</td>
+              <td>{{ row.average_ticket | money }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5">Todavia no hay movimientos historicos para resumir.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Patrimonio</p>
+        <h3>Evolucion consolidada</h3>
+      </div>
+    </div>
+    <canvas class="chart-canvas line-chart" data-chart-type="multi-line" data-chart='{{ chart | tojson }}'></canvas>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Mes a mes</p>
+        <h3>Ahorro automatico, movido y sobrante</h3>
+      </div>
+    </div>
+    <canvas class="chart-canvas line-chart" data-chart-type="line" data-chart='{{ monthly_chart | tojson }}'></canvas>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Resumen mensual</p>
+        <h3>Ingresos, ahorro y patrimonio</h3>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Mes</th>
+            <th>Ingresos</th>
+            <th>Fijos</th>
+            <th>Variables</th>
+            <th>Reinversión</th>
+            <th>Excepcionales</th>
+            <th>Ahorro automatico</th>
+            <th>Ahorro movido</th>
+            <th>Sobrante del mes</th>
+            <th>Capacidad vs automatico</th>
+            <th>Inversion</th>
+            <th>Patrimonio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.month_label }}</td>
+              <td>{{ row.income_total | money }}</td>
+              <td>{{ row.fixed_expenses | money }}</td>
+              <td>{{ row.variable_expenses | money }}</td>
+              <td>{{ row.reinvestment_expenses | money }}</td>
+              <td>{{ row.exceptional_expenses | money }}</td>
+              <td>{{ row.savings_target | money }}</td>
+              <td>{{ row.savings_moved | money }}</td>
+              <td class="{% if row.pending_assignment >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.pending_assignment | money }}</td>
+              <td class="{% if row.savings_real_vs_automatic >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.savings_real_vs_automatic | money }}</td>
+              <td>{{ row.investment_real | money }}</td>
+              <td>{{ row.net_worth | money }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Actividad</p>
+        <h3>Importaciones recientes</h3>
+      </div>
+    </div>
+    <div class="timeline-list">
+      {% for job in imports %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ SOURCE_LABELS[job.source] }}</strong>
+            <p>{{ job.filename }}</p>
+          </div>
+          <div class="timeline-meta">
+            <span class="tag {{ job.status }}">{{ job.status }}</span>
+            <small>{{ job.imported_at | compact_date }}</small>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

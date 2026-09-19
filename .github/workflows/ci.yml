@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile Python
+        run: python -m compileall -q app.py finance_dashboard scripts tests
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check JavaScript syntax
+        run: node --check static/app.js
+
+      - name: Check tracked private artifacts
+        run: python scripts/check_repository_privacy.py
+
+      - name: Validate Docker Compose
+        run: |
+          cp .env.example app.env
+          docker compose config --quiet
+          rm app.env
+
+      - name: Check whitespace
+        run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD

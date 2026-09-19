@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% set hide_chrome = True %}
+
+{% block content %}
+<section class="auth-card">
+  <div class="auth-copy">
+    <p class="eyebrow">Acceso privado</p>
+    <h2>Tu dashboard financiero local</h2>
+    <p>
+      Presupuesto mensual, movimientos bancarios, ahorro, inversion y patrimonio
+      calculados desde tu base de datos local y los ficheros que importes.
+    </p>
+  </div>
+
+  <form method="post" class="auth-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label>
+      <span>Usuario</span>
+      <input type="text" name="username" autocomplete="username" required>
+    </label>
+
+    <label>
+      <span>Contrasena</span>
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+
+    <button type="submit" class="primary-button">Entrar al dashboard</button>
+  </form>
+</section>
+{% endblock %}

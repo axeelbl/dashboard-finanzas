@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <div class="toolbar-group">
+    <form method="get" class="inline-form inline-form-end">
+      <label>
+        <span>Mes</span>
+        <select name="month" onchange="this.form.submit()">
+          {% for option in month_options %}
+            <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <a href="{{ url_for('web.investment_plan', month=selected_month) }}" class="ghost-button">Configurar plan</a>
+    <form method="post" action="{{ url_for('web.refresh_investment_prices') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+      <button type="submit" class="ghost-button">Refrescar precios live</button>
+    </form>
+  </div>
+</section>
+
+<section class="hero-grid hero-grid-summary">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Cartera actual</p>
+    <h3>{{ investment.known_value | money }}</h3>
+    <p class="hero-meta">
+      Snapshot mas reciente: <strong>{{ investment.latest_snapshot_date | compact_date }}</strong>
+      {% if investment.missing_positions_count %}
+        <span class="tag warning">{{ investment.missing_positions_count }} sin valorar</span>
+      {% endif %}
+    </p>
+
+    <div class="pill-row">
+      <span class="tag {{ plan.status_tone }}">{{ plan.status_label }}</span>
+      <span class="tag muted">Plan {{ plan.total_target_percent }}%</span>
+      <span class="tag {% if plan.monthly_variance >= 0 %}success{% else %}warning{% endif %}">Mes {{ plan.monthly_actual | money }} / {{ plan.monthly_target | money }}</span>
+      {% for row in investment.freshness_rows %}
+        <span class="tag {{ row.tone }}">{{ row.label }} · {{ row.snapshot_date | compact_date }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Aportado neto</span>
+        <strong>{{ investment.total_contributed | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Diferencia actual</span>
+        <strong class="{% if investment.total_platform_difference >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ investment.total_platform_difference | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Diferencia %</span>
+        <strong class="{% if investment.total_platform_difference_percent is not none and investment.total_platform_difference_percent >= 0 %}value-positive{% elif investment.total_platform_difference_percent is not none %}value-negative{% endif %}">
+          {% if investment.total_platform_difference_percent is not none %}{{ investment.total_platform_difference_percent }}%{% else %}N/D{% endif %}
+        </strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Objetivo del mes</p>
+    <strong>{{ plan.monthly_target | money }}</strong>
+    <span>Invertido real: {{ plan.monthly_actual | money }}</span>
+  </article>
+
+  <article class="metric-card metric-card-tone-{{ plan.monthly_status_tone }}">
+    <p>Desviacion mensual</p>
+    <strong class="{% if plan.monthly_variance >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ plan.monthly_variance | money }}</strong>
+    <span>Plan mensual vs movimientos del banco</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Activos planificados</p>
+    <strong>{{ plan.count_active }}</strong>
+    <span>{{ plan.total_target_percent }}% del plan activo</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Cobertura del plan</p>
+    <strong>{{ plan.coverage_percent }}%</strong>
+    <span>{{ plan.matched_value | money }} mapeados contra la cartera</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Fuera de plan</p>
+    <strong>{{ plan.unplanned_holdings_count }}</strong>
+    <span>{{ plan.unplanned_value | money }} sin objetivo</span>
+  </article>
+</section>
+
+{% if plan.alerts %}
+  <section class="panel-grid">
+    <article class="panel-card panel-card-wide">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Plan</p>
+          <h3>Alertas de estrategia</h3>
+        </div>
+        <a href="{{ url_for('web.investment_plan', month=selected_month) }}" class="text-link">Editar plan</a>
+      </div>
+
+      <div class="alert-list">
+        {% for alert in plan.alerts %}
+          <article class="alert-item alert-item-{{ alert.tone }}">
+            <div class="text-stack">
+              <strong>{{ alert.title }}</strong>
+              <p>{{ alert.detail }}</p>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+{% endif %}
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Plan de cartera</p>
+        <h3>Objetivo vs composicion real</h3>
+      </div>
+      <a href="{{ url_for('web.investment_plan', month=selected_month) }}" class="text-link">Gestionar</a>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Suma del plan</span>
+        <strong>{{ plan.total_target_percent }}%</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Base para sugerencias</span>
+        <strong>{{ plan.allocation_basis_label }}</strong>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in plan.priority_rows[:6] %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.name }}</strong>
+            <p>Objetivo {{ row.target_percent }}% · Real {{ row.real_weight_percent }}%</p>
+          </div>
+          <div class="mini-list-side">
+            <strong class="{% if row.difference_percent <= 0 %}value-positive{% else %}value-negative{% endif %}">
+              {% if row.difference_percent > 0 %}+{% endif %}{{ row.difference_percent }} pp
+            </strong>
+            <span class="tag {{ row.status_tone }}">{{ row.status_label }}</span>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>{% if plan.count_active %}Plan bastante alineado{% else %}Sin plan todavia{% endif %}</strong>
+          <p>{% if plan.count_active %}No hay desajustes grandes; puedes seguir aportando segun el reparto base del plan.{% else %}Define activos objetivo para ver desviaciones de cartera y prioridades reales.{% endif %}</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <p class="surface-caption">Una desviacion positiva indica sobrepeso. Una negativa indica infrapeso y normalmente merece prioridad.</p>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Proxima aportacion</p>
+        <h3>Donde meter el siguiente dinero</h3>
+      </div>
+    </div>
+
+    <div class="surface-note">
+      <p><strong>Referencia del mes:</strong> {{ plan.monthly_target | money }} de objetivo, {{ plan.monthly_actual | money }} ya ejecutados y {{ plan.next_budget_amount | money }} pendientes.</p>
+      <p class="muted-copy">La sugerencia reparte solo lo pendiente del mes segun como quedaria la cartera despues de aportar. Si el plan no suma 100%, se normaliza.</p>
+    </div>
+
+    <div class="meter-list">
+      {% for row in plan.suggestion_rows[:6] %}
+        <article class="meter-row">
+          <div class="meter-copy">
+            <strong>{{ row.name }}</strong>
+            <p>{{ row.next_action }} · objetivo {{ row.target_percent }}% · real {{ row.real_weight_percent }}%</p>
+          </div>
+          <div class="meter-value">
+            <strong>{{ row.next_amount | money }}</strong>
+            <div class="meter-track">
+              <span style="width: {{ row.normalized_target_percent }}%;"></span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>{% if plan.count_active and plan.next_budget_amount <= 0 %}Objetivo mensual cubierto{% else %}Sin sugerencia disponible{% endif %}</strong>
+          <p>{% if plan.count_active and plan.next_budget_amount <= 0 %}No queda dinero pendiente de asignar este mes.{% else %}Cuando definas un plan activo veremos cuanto tocaria aportar a cada activo.{% endif %}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Plan vs real</p>
+        <h3>Comparacion por activo objetivo</h3>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Activo</th>
+            <th>Objetivo</th>
+            <th>Valor real</th>
+            <th>% real</th>
+            <th>Desviacion</th>
+            <th>Siguiente aporte</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in plan.rows %}
+            <tr>
+              <td>
+                <strong>{{ row.name }}</strong>
+                <small>{{ row.symbol or row.match_key }}</small>
+                <small>{{ row.asset_type_label }} · {{ row.preferred_source_label }}</small>
+              </td>
+              <td>{{ row.target_percent }}%</td>
+              <td>{{ row.real_value | money }}</td>
+              <td>{{ row.real_weight_percent }}%</td>
+              <td class="{% if row.difference_percent <= 0 %}value-positive{% else %}value-negative{% endif %}">
+                {% if row.difference_percent > 0 %}+{% endif %}{{ row.difference_percent }} pp
+                {% if row.gap_value is not none %}
+                  <small>{% if row.gap_value > 0 %}Faltan {{ row.gap_value | money }}{% elif row.gap_value < 0 %}Sobran {{ (row.gap_value * -1) | money }}{% else %}En objetivo{% endif %}</small>
+                {% endif %}
+              </td>
+              <td>
+                {{ row.next_amount | money }}
+                <small>{{ row.next_action }}</small>
+              </td>
+              <td><span class="tag {{ row.status_tone }}">{{ row.status_label }}</span></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7">Todavia no hay activos definidos en el plan de inversion.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Distribucion</p>
+        <h3>Por plataforma</h3>
+      </div>
+    </div>
+
+    <canvas class="chart-canvas donut-chart" data-chart-type="donut" data-chart='{{ investment.chart_by_source | tojson }}'></canvas>
+
+    <div class="meter-list">
+      {% for row in source_rows %}
+        <article class="meter-row">
+          <div class="meter-copy">
+            <strong>{{ row.label }}</strong>
+            <p>Actual {{ row.value | money }} · aportado {{ row.contributed_amount | money }} · {{ row.positions_count }} posiciones</p>
+          </div>
+          <div class="meter-value">
+            <strong class="{% if row.performance_amount >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.performance_amount | money }}</strong>
+            <small>{% if row.performance_percent is not none %}{{ row.performance_percent }}% · {% endif %}{{ row.weight_percent }}% cartera</small>
+            <div class="meter-track">
+              <span style="width: {{ row.weight_percent }}%; background: {{ row.color }};"></span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin plataformas activas</strong>
+          <p>No hay posiciones suficientes para agrupar la cartera.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Distribucion</p>
+        <h3>Por tipo de activo</h3>
+      </div>
+    </div>
+
+    <canvas class="chart-canvas donut-chart" data-chart-type="donut" data-chart='{{ investment.chart_by_type | tojson }}'></canvas>
+
+    <div class="meter-list">
+      {% for row in type_rows %}
+        <article class="meter-row">
+          <div class="meter-copy">
+            <strong>{{ row.label }}</strong>
+            <p>{{ row.value | money }} · {{ row.positions_count }} posiciones</p>
+          </div>
+          <div class="meter-value">
+            <strong>{{ row.weight_percent }}%</strong>
+            <div class="meter-track">
+              <span style="width: {{ row.weight_percent }}%; background: {{ row.color }};"></span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin tipos de activo</strong>
+          <p>Importa una cartera valorada para ver esta distribucion.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Evolucion</p>
+        <h3>Valor de la cartera</h3>
+      </div>
+      <span class="tag muted">Valor vs coste conocido</span>
+    </div>
+
+    <canvas class="chart-canvas line-chart" data-chart-type="line" data-chart='{{ investment.history_chart | tojson }}'></canvas>
+    <p class="surface-caption">{{ investment.history_note }}</p>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Concentracion</p>
+        <h3>Top posiciones y fuera del plan</h3>
+      </div>
+    </div>
+
+    <div class="meter-list">
+      {% for row in investment.top_positions %}
+        <article class="meter-row">
+          <div class="meter-copy">
+            <strong>{{ row.asset_name }}</strong>
+            <p>{{ row.asset_type_label }} · {{ row.value | money }}</p>
+          </div>
+          <div class="meter-value">
+            <strong>{{ row.weight_percent }}%</strong>
+            <div class="meter-track">
+              <span style="width: {{ row.weight_percent }}%;"></span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin posiciones destacables</strong>
+          <p>No hay suficientes valores para ordenar la cartera.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if plan.unplanned_holdings %}
+      <div class="section-divider"></div>
+      <div class="mini-list">
+        {% for row in plan.unplanned_holdings[:4] %}
+          <article class="mini-list-item">
+            <div class="text-stack">
+              <strong>{{ row.asset_name }}</strong>
+              <p>{{ row.asset_type_label }} · fuera del plan</p>
+            </div>
+            <div class="mini-list-side">
+              <strong>{{ row.value | money }}</strong>
+              <small>{{ row.weight_percent }}%</small>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if investment.warnings %}
+      <div class="surface-note">
+        {% for warning in investment.warnings %}
+          <p class="{% if warning.tone == 'error' %}value-negative{% else %}muted-copy{% endif %}">
+            <strong>{{ warning.title }}.</strong> {{ warning.detail }}
+          </p>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Aportaciones</p>
+        <h3>Seguimiento mensual</h3>
+      </div>
+    </div>
+
+    <canvas class="chart-canvas line-chart" data-chart-type="line" data-chart='{{ history_chart | tojson }}'></canvas>
+
+    <div class="mini-list">
+      {% for row in recent_transactions[:6] %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }}</p>
+          </div>
+          <strong>{{ row.amount | money }}</strong>
+        </article>
+      {% else %}
+        <p class="muted-copy">Aun no hay movimientos bancarios marcados como inversion.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Posiciones</p>
+        <h3>Cartera actual ordenada</h3>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Activo</th>
+            <th>Tipo</th>
+            <th>Fuente</th>
+            <th>Cantidad</th>
+            <th>Valor</th>
+            <th>Peso</th>
+            <th>Coste</th>
+            <th>P/L</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in positions %}
+            <tr>
+              <td>
+                <strong>{{ row.asset_name }}</strong>
+                <small>{{ row.symbol }}</small>
+              </td>
+              <td>{{ row.asset_type_label }}</td>
+              <td>{{ row.source_label }}</td>
+              <td>{{ row.quantity if row.quantity is not none else "N/D" }}</td>
+              <td>{% if row.market_value is not none %}{{ row.market_value | money }}{% else %}N/D{% endif %}</td>
+              <td>{% if row.market_value is not none %}{{ row.weight_percent }}%{% else %}N/D{% endif %}</td>
+              <td>{% if row.cost_basis is not none %}{{ row.cost_basis | money }}{% else %}N/D{% endif %}</td>
+              <td class="{% if row.pnl_value is not none and row.pnl_value >= 0 %}value-positive{% elif row.pnl_value is not none %}value-negative{% endif %}">
+                {% if row.pnl_value is not none %}
+                  {{ row.pnl_value | money }}
+                  {% if row.pnl_percent is not none %}
+                    <small>{{ row.pnl_percent }}%</small>
+                  {% endif %}
+                {% else %}
+                  N/D
+                {% endif %}
+              </td>
+              <td><span class="tag {{ row.valuation_tone }}">{{ row.valuation_label }}</span></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="9">No hay posiciones cargadas todavia.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+{% if investment.missing_positions_count %}
+  <section class="panel-grid">
+    <article class="panel-card panel-card-wide">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Sin valorar</p>
+          <h3>Posiciones que necesitan correccion</h3>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Activo</th>
+              <th>Tipo</th>
+              <th>Fuente</th>
+              <th>Cantidad</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in investment.missing_positions %}
+              <tr>
+                <td>{{ row.asset_name }}</td>
+                <td>{{ row.asset_type_label }}</td>
+                <td>{{ row.source_label }}</td>
+                <td>{{ row.quantity if row.quantity is not none else "N/D" }}</td>
+                <td>{{ row.hint }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+{% endif %}
+{% endblock %}

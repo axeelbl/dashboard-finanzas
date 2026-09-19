@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <div class="toolbar-group">
+    <form method="get" class="inline-form inline-form-end">
+      <label>
+        <span>Mes de referencia</span>
+        <select name="month" onchange="this.form.submit()">
+          {% for option in month_options %}
+            <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <a href="{{ url_for('web.investments', month=selected_month) }}" class="ghost-button">Volver a inversiones</a>
+  </div>
+</section>
+
+<section class="hero-grid hero-grid-summary">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Plan de cartera</p>
+    <h3>{{ plan.total_target_percent }}%</h3>
+    <p class="hero-meta">
+      {{ plan.count_active }} activos activos
+      <span class="tag {{ plan.status_tone }}">{{ plan.status_label }}</span>
+    </p>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Objetivo mensual</span>
+        <strong>{{ plan.monthly_target | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Invertido real</span>
+        <strong>{{ plan.monthly_actual | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Cobertura</span>
+        <strong>{{ plan.coverage_percent }}%</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Activos activos</p>
+    <strong>{{ plan.count_active }}</strong>
+    <span>{{ plan.count_total }} lineas totales guardadas</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Cartera cubierta</p>
+    <strong>{{ plan.matched_value | money }}</strong>
+    <span>{{ plan.coverage_percent }}% de la cartera valorada</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Fuera de plan</p>
+    <strong>{{ plan.unplanned_value | money }}</strong>
+    <span>{{ plan.unplanned_holdings_count }} activos sin objetivo</span>
+  </article>
+
+  <article class="metric-card metric-card-tone-{{ plan.monthly_status_tone }}">
+    <p>Mes actual</p>
+    <strong class="{% if plan.monthly_variance >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ plan.monthly_variance | money }}</strong>
+    <span>Objetivo mensual vs inversion ejecutada</span>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Nueva linea</p>
+        <h3>Anadir activo objetivo</h3>
+      </div>
+    </div>
+
+    <form method="post" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+
+      <div class="form-grid">
+        <label>
+          <span>Nombre visible</span>
+          <input type="text" name="name" placeholder="Fondo global o activo digital" required>
+        </label>
+        <label>
+          <span>Simbolo o identificador</span>
+          <input type="text" name="symbol" placeholder="ACTIVO_1, ACTIVO_2">
+        </label>
+        <label>
+          <span>Tipo de activo</span>
+          <select name="asset_type">
+            {% for option in asset_type_options %}
+              <option value="{{ option.value }}">{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Fuente preferida</span>
+          <select name="preferred_source">
+            {% for option in source_options %}
+              <option value="{{ option.value }}">{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>% objetivo</span>
+          <input type="number" step="0.1" min="0" max="100" name="target_percent" placeholder="20" required>
+        </label>
+        <label>
+          <span>Orden</span>
+          <input type="number" step="1" min="0" name="sort_order" value="0">
+        </label>
+      </div>
+
+      <button type="submit" class="primary-button">Guardar activo objetivo</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Vista rapida</p>
+        <h3>Que te esta diciendo el plan</h3>
+      </div>
+    </div>
+
+    {% if plan.alerts %}
+      <div class="alert-list">
+        {% for alert in plan.alerts %}
+          <article class="alert-item alert-item-{{ alert.tone }}">
+            <div class="text-stack">
+              <strong>{{ alert.title }}</strong>
+              <p>{{ alert.detail }}</p>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="surface-note">
+        <p><strong>Plan equilibrado.</strong> La suma actual del plan esta en rango y la cartera puede compararse con claridad.</p>
+      </div>
+    {% endif %}
+
+    <div class="section-divider"></div>
+
+    <div class="mini-list">
+      {% for row in plan.priority_rows[:5] %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.name }}</strong>
+            <p>Objetivo {{ row.target_percent }}% · Real {{ row.real_weight_percent }}%</p>
+          </div>
+          <div class="mini-list-side">
+            <strong class="{% if row.difference_percent <= 0 %}value-positive{% else %}value-negative{% endif %}">
+              {% if row.difference_percent > 0 %}+{% endif %}{{ row.difference_percent }} pp
+            </strong>
+            <span class="tag {{ row.status_tone }}">{{ row.status_label }}</span>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>{% if plan.count_active %}Sin grandes desajustes{% else %}Sin comparacion todavia{% endif %}</strong>
+          <p>{% if plan.count_active %}La cartera esta bastante cerca del reparto objetivo y no hay desviaciones fuertes que priorizar.{% else %}Cuando guardes activos objetivo veremos aqui los principales desajustes.{% endif %}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Sugerencia</p>
+        <h3>Proxima aportacion segun tu plan</h3>
+      </div>
+      <span class="tag muted">{{ plan.allocation_basis_label }}</span>
+    </div>
+
+    <div class="meter-list">
+      {% for row in plan.suggestion_rows[:8] %}
+        <article class="meter-row">
+          <div class="meter-copy">
+            <strong>{{ row.name }}</strong>
+            <p>{{ row.next_action }} · objetivo {{ row.target_percent }}% · real {{ row.real_weight_percent }}%</p>
+          </div>
+          <div class="meter-value">
+            <strong>{{ row.next_amount | money }}</strong>
+            <div class="meter-track">
+              <span style="width: {{ row.normalized_target_percent }}%;"></span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin reparto sugerido</strong>
+          <p>El objetivo mensual de inversion se repartira aqui automaticamente cuando haya plan activo.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Gestion</p>
+        <h3>Editar lineas del plan</h3>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in targets %}
+        <article class="plan-target-card">
+          <div class="plan-target-head">
+            <div class="text-stack">
+              <strong>{{ row.name }}</strong>
+              <p>{{ row.symbol or row.match_key }} · {{ row.preferred_source_label }}</p>
+            </div>
+            <span class="tag {{ 'success' if row.active else 'muted' }}">{{ 'Activa' if row.active else 'Inactiva' }}</span>
+          </div>
+
+          <form method="post" action="{{ url_for('web.investment_plan_update', target_id=row.id) }}" class="plan-row-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="month" value="{{ selected_month }}">
+
+            <label>
+              <span>Nombre</span>
+              <input type="text" name="name" value="{{ row.name }}" required>
+            </label>
+            <label>
+              <span>Simbolo</span>
+              <input type="text" name="symbol" value="{{ row.symbol or '' }}">
+            </label>
+            <label>
+              <span>Tipo</span>
+              <select name="asset_type">
+                {% for option in asset_type_options %}
+                  <option value="{{ option.value }}" {% if option.value == (row.asset_type or '') %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>Fuente</span>
+              <select name="preferred_source">
+                {% for option in source_options %}
+                  <option value="{{ option.value }}" {% if option.value == (row.preferred_source or '') %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>% objetivo</span>
+              <input type="number" step="0.1" min="0" max="100" name="target_percent" value="{{ row.target_percent }}" required>
+            </label>
+            <label>
+              <span>Orden</span>
+              <input type="number" step="1" min="0" name="sort_order" value="{{ row.sort_order }}">
+            </label>
+
+            <div class="plan-row-actions">
+              <button type="submit" class="primary-button">Guardar</button>
+            </div>
+          </form>
+
+          <form method="post" action="{{ url_for('web.investment_plan_toggle', target_id=row.id) }}" class="plan-toggle-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="month" value="{{ selected_month }}">
+            <button type="submit" class="ghost-button">{{ 'Desactivar' if row.active else 'Activar' }}</button>
+          </form>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Todavia no hay lineas de plan</strong>
+          <p>Anade los activos que quieres tener y el porcentaje objetivo de cada uno.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

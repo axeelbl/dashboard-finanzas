@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <form method="get" class="inline-form inline-form-end">
+    <label>
+      <span>Mes</span>
+      <select name="month" onchange="this.form.submit()">
+        {% for option in month_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="hero-grid hero-grid-dashboard">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Estado del mes</p>
+    <h3>{{ month_state.title }}</h3>
+    <p class="hero-meta">{{ month_state.detail }}</p>
+
+    <div class="pill-row">
+      <span class="tag muted">{{ budget.month_label }}</span>
+      <span class="tag muted">Efectivo {{ cash.total | money }}</span>
+      <span class="tag muted">Reinversión {{ budget.actuals.reinvestment | money }}</span>
+      <span class="tag {% if savings.pending_assignment >= 0 %}success{% else %}warning{% endif %}">Sobrante {{ savings.pending_assignment | money }}</span>
+      <span class="tag muted">Ahorro automatico {{ savings.automatic_target | money }}</span>
+      <span class="tag muted">Ahorro movido {{ savings.moved_actual | money }}</span>
+      {% if budget.pending_review_count %}
+        <span class="tag warning">{{ budget.pending_review_count }} pendientes</span>
+      {% endif %}
+      {% if investment.missing_positions_count %}
+        <span class="tag warning">{{ investment.missing_positions_count }} posiciones sin valorar</span>
+      {% endif %}
+    </div>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Patrimonio total</span>
+        <strong>{{ kpis.total_net_worth | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Asignado real</span>
+        <strong>{{ budget.actual_assignment_percent }}%</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Avance del mes</span>
+        <strong>{{ month_progress.percent }}%</strong>
+      </div>
+    </div>
+  </article>
+
+  {% for card in kpi_cards %}
+    <article class="metric-card metric-card-tone-{{ card.tone }}">
+      <p>{{ card.label }}</p>
+      <strong>{{ card.value | money }}</strong>
+      <span>{{ card.helper }}</span>
+    </article>
+  {% endfor %}
+</section>
+{#
+
+            <p>{{ row.status_label }} · {{ row.helper }}</p>
+#}
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Desde {{ baseline.date | compact_date }}</p>
+        <h3>Distribucion visible</h3>
+      </div>
+      <a href="{{ url_for('web.history') }}" class="text-link">Abrir historico</a>
+    </div>
+
+    <canvas class="chart-canvas donut-chart" data-chart-type="donut" data-chart='{{ global_summary.category_chart | tojson }}'></canvas>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Desde {{ baseline.date | compact_date }}</p>
+        <h3>Totales acumulados</h3>
+      </div>
+      <span class="tag muted">{{ global_summary.transaction_count }} movimientos</span>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Ingresos</span>
+        <strong>{{ global_summary.total_income_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Gasto operativo</span>
+        <strong>{{ global_summary.total_expenses_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Inversion</span>
+        <strong>{{ global_summary.total_investment_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Reinversion</span>
+        <strong>{{ global_summary.total_reinvestment_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Ahorro movido</span>
+        <strong>{{ global_summary.total_savings_moved_all_time | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Sobrante no asignado</span>
+        <strong class="{% if global_summary.total_pending_assignment_all_time >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ global_summary.total_pending_assignment_all_time | money }}</strong>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Estado del mes</p>
+        <h3>Lo importante ahora</h3>
+      </div>
+      <a href="{{ url_for('web.budget', month=selected_month) }}" class="text-link">Abrir presupuesto</a>
+    </div>
+
+    <div class="insight-list">
+      {% for row in month_health_rows %}
+        <article class="insight-row">
+          <div class="text-stack">
+            <strong>{{ row.label }}</strong>
+            <p>{{ row.helper }}</p>
+          </div>
+          <div class="insight-metrics">
+            <strong class="{% if row.tone == 'success' %}value-positive{% elif row.tone == 'warning' %}value-negative{% endif %}">{{ row.actual | money }}</strong>
+            {% if row.target is not none %}
+              <small>Objetivo {{ row.target | money }}</small>
+            {% endif %}
+            {% if row.variance is not none %}
+              <small class="{% if row.variance >= 0 %}value-positive{% else %}value-negative{% endif %}">
+                {% if row.variance >= 0 %}+{% endif %}{{ row.variance | money }}
+              </small>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Cosas a revisar</p>
+        <h3>Alertas y pendientes</h3>
+      </div>
+    </div>
+
+    <div class="alert-list">
+      {% for alert in alerts %}
+        <article class="alert-item alert-item-{{ alert.tone }}">
+          <div class="text-stack">
+            <strong>{{ alert.title }}</strong>
+            <p>{{ alert.detail }}</p>
+          </div>
+          <a href="{{ alert.href }}" class="text-link">Revisar</a>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Todo bastante ordenado</strong>
+          <p>No hay alertas importantes para este mes.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="mini-list">
+      {% for row in review_items %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }}</p>
+          </div>
+          <strong class="{% if row.amount >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.amount | money }}</strong>
+        </article>
+      {% else %}
+        <p class="muted-copy">No hay movimientos pendientes este mes.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Inversiones</p>
+        <h3>Distribucion por plataforma</h3>
+      </div>
+      <a href="{{ url_for('web.investments', month=selected_month) }}" class="text-link">Abrir inversiones</a>
+    </div>
+
+    <canvas class="chart-canvas donut-chart" data-chart-type="donut" data-chart='{{ investment.chart_by_source | tojson }}'></canvas>
+
+    <div class="meter-list">
+      {% for row in investment.source_rows %}
+        <article class="meter-row">
+          <div class="meter-copy">
+            <strong>{{ row.label }}</strong>
+            <p>{{ row.positions_count }} posiciones · {{ row.value | money }}</p>
+          </div>
+          <div class="meter-value">
+            <strong>{{ row.weight_percent }}%</strong>
+            <div class="meter-track">
+              <span style="width: {{ row.weight_percent }}%; background: {{ row.color }};"></span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin cartera cargada</strong>
+          <p>Importa una cartera para ver el reparto por plataforma.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Inversiones</p>
+        <h3>Plan vs real</h3>
+      </div>
+      <a href="{{ url_for('web.investment_plan', month=selected_month) }}" class="text-link">Editar plan</a>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Objetivo mensual</span>
+        <strong>{{ investment_plan.monthly_target | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Invertido real</span>
+        <strong>{{ investment_plan.monthly_actual | money }}</strong>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in investment_plan.priority_rows[:3] %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.name }}</strong>
+            <p>Objetivo {{ row.target_percent }}% · Real {{ row.real_weight_percent }}%</p>
+          </div>
+          <div class="mini-list-side">
+            <strong class="{% if row.difference_percent <= 0 %}value-positive{% else %}value-negative{% endif %}">
+              {% if row.difference_percent > 0 %}+{% endif %}{{ row.difference_percent }} pp
+            </strong>
+            <span class="tag {{ row.status_tone }}">{{ row.status_label }}</span>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>{% if investment_plan.count_active %}Plan bastante alineado{% else %}Sin plan de inversion definido{% endif %}</strong>
+          <p>{% if investment_plan.count_active %}No hay desajustes grandes en la cartera respecto a tu plan activo.{% else %}Configura tu cartera objetivo para ver los principales desajustes desde el resumen.{% endif %}</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if investment_plan.priority_rows %}
+      <div class="surface-note">
+        <p><strong>{{ investment_plan.status_label }}.</strong> El plan activo suma {{ investment_plan.total_target_percent }}% y cubre {{ investment_plan.coverage_percent }}% de la cartera valorada.</p>
+      </div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Ahorro</p>
+        <h3>Automatico, movido y sobrante</h3>
+      </div>
+      <a href="{{ url_for('web.savings', month=selected_month) }}" class="text-link">Abrir ahorro</a>
+    </div>
+
+    <div class="stat-chip-row">
+      <div class="stat-chip">
+        <span>Colchon real</span>
+        <strong>{{ savings.real_cushion | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Ahorro automatico</span>
+        <strong>{{ savings.automatic_target | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Ahorro movido</span>
+        <strong>{{ savings.moved_actual | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Sobrante del mes</span>
+        <strong>{{ savings.pending_assignment | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Colchon</span>
+        <strong>{% if savings.buffer_months is not none %}{{ savings.buffer_months }} meses{% else %}N/D{% endif %}</strong>
+      </div>
+    </div>
+
+    <div class="surface-note">
+      <p class="{% if savings.pending_assignment >= 0 %}value-positive{% else %}value-negative{% endif %}">
+        <strong>{{ savings.status_label }}.</strong> {{ savings.comparison_copy }}
+      </p>
+      <p class="muted-copy">Capacidad libre vs ahorro automatico: {{ savings.capacity_difference_vs_target | money }}. {{ savings.closing_hint }}</p>
+    </div>
+
+    <canvas class="chart-canvas line-chart" data-chart-type="line" data-chart='{{ savings.history_chart | tojson }}'></canvas>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Gastos fijos</p>
+        <h3>Seguimiento real</h3>
+      </div>
+      <a href="{{ url_for('web.fixed_expenses', month=selected_month) }}" class="text-link">Abrir gastos fijos</a>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Esperado</span>
+        <strong>{{ fixed.expected_total | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Real</span>
+        <strong>{{ fixed.actual_total | money }}</strong>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in fixed.missing_rules[:3] %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.name }}</strong>
+            <p>No ha aparecido aun este mes.</p>
+          </div>
+          <span class="tag warning">Pendiente</span>
+        </article>
+      {% else %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>Sin huecos importantes</strong>
+            <p>Todas las reglas activas detectadas hasta ahora van razonablemente bien.</p>
+          </div>
+          <span class="tag success">Bien</span>
+        </article>
+      {% endfor %}
+
+      {% for row in fixed.uncovered_fixed[:2] %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }} · cargo fijo sin regla</p>
+          </div>
+          <strong>{{ row.amount | money }}</strong>
+        </article>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Patrimonio</p>
+        <h3>Evolucion total</h3>
+      </div>
+      <span class="tag muted">Desde {{ baseline.date | compact_date }}</span>
+    </div>
+    <canvas class="chart-canvas line-chart" data-chart-type="multi-line" data-chart='{{ history_chart | tojson }}'></canvas>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Banco</p>
+        <h3>Movimientos recientes</h3>
+      </div>
+      <a href="{{ url_for('web.bank', month=selected_month) }}" class="text-link">Abrir banco</a>
+    </div>
+
+    <div class="mini-list">
+      {% for row in recent_transactions %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }}</p>
+          </div>
+          <div class="mini-list-side">
+            {% if row.category_name %}
+              <span class="tag muted">{{ row.category_name }}</span>
+            {% else %}
+              <span class="tag warning">Pendiente</span>
+            {% endif %}
+            <strong class="{% if row.amount >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.amount | money }}</strong>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin movimientos recientes</strong>
+          <p>No hay actividad bancaria para este mes.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Importaciones</p>
+        <h3>Ultimas entradas</h3>
+      </div>
+      <a href="{{ url_for('web.import_data') }}" class="text-link">Importar mas</a>
+    </div>
+
+    <div class="timeline-list">
+      {% for job in recent_imports %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ SOURCE_LABELS[job.source] }}</strong>
+            <p>{{ job.filename }}</p>
+          </div>
+          <div class="timeline-meta">
+            <span class="tag {{ job.status }}">{{ job.status }}</span>
+            <small>{{ job.imported_at | compact_date }}</small>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin importaciones</strong>
+          <p>Aun no se han registrado importaciones recientes.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <form method="get" class="inline-form inline-form-end">
+    <label>
+      <span>Mes</span>
+      <select name="month" onchange="this.form.submit()">
+        {% for option in month_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="hero-grid hero-grid-bank">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Banco real</p>
+    <h3>{{ bank_balance | money }}</h3>
+    <p class="hero-meta">Ultimo apunte: <strong>{{ bank_date | compact_date }}</strong> - El dinero sigue en la cuenta bancaria.</p>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">En bolsas virtuales</span>
+        <strong>{{ bank_subbalances.total_virtual | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Libre no asignado</span>
+        <strong class="{% if bank_subbalances.free_unassigned is not none and bank_subbalances.free_unassigned < 0 %}value-negative{% endif %}">{{ bank_subbalances.free_unassigned | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Mes</span>
+        <strong>{{ selected_month | month_name }}</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Bolsas virtuales</p>
+    <strong>{{ bank_subbalances.total_virtual | money }}</strong>
+    <span>Reservado logicamente dentro del banco</span>
+  </article>
+
+  <article class="metric-card metric-card-tone-{% if bank_subbalances.is_over_reserved %}warning{% else %}neutral{% endif %}">
+    <p>Libre no asignado</p>
+    <strong class="{% if bank_subbalances.free_unassigned is not none and bank_subbalances.free_unassigned < 0 %}value-negative{% endif %}">{{ bank_subbalances.free_unassigned | money }}</strong>
+    <span>Saldo real sin bolsa virtual</span>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Bolsas virtuales</p>
+        <h3>Remanente acumulado dentro del banco</h3>
+      </div>
+      <span class="tag muted">No mueve dinero real</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Bolsa virtual</th>
+            <th>Remanente anterior</th>
+            <th>Presupuesto mes</th>
+            <th>Gasto mes</th>
+            <th>Usado de bolsa</th>
+            <th>Disponible</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in bank_subbalances.rows %}
+            <tr>
+              <td>
+                <strong>{{ row.category_name }}</strong>
+                <small>Dinero sigue en el banco</small>
+              </td>
+              <td>{{ row.opening_balance | money }}</td>
+              <td>{{ row.monthly_budget_amount | money }}</td>
+              <td>{{ row.monthly_spent_amount | money }}</td>
+              <td>{{ row.rollover_consumed_amount | money }}</td>
+              <td>{{ row.closing_balance | money }}</td>
+              <td>
+                <span class="tag {{ row.tone }}">{{ row.status_label }}</span>
+                <small>{{ row.helper }}</small>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="surface-caption">Solo acumulan Variable general, Excepcionales y Reinversion. Gasto fijo, ahorro e inversion no generan bolsa virtual.</p>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Banco real</p>
+        <h3>Reparto interno del banco</h3>
+      </div>
+      <a href="{{ url_for('web.bank', month=selected_month) }}" class="text-link">Ver movimientos</a>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Saldo real del banco</span>
+        <strong>{{ bank_subbalances.bank_balance | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Total en bolsas virtuales</span>
+        <strong>{{ bank_subbalances.total_virtual | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Libre no asignado</span>
+        <strong class="{% if bank_subbalances.free_unassigned is not none and bank_subbalances.free_unassigned < 0 %}value-negative{% endif %}">{{ bank_subbalances.free_unassigned | money }}</strong>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in bank_subbalances.rows %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.category_name }}</strong>
+            <p>{{ row.status_label }} - {{ row.helper }}</p>
+          </div>
+          <div class="mini-list-side">
+            <strong>{{ row.closing_balance | money }}</strong>
+            {% if row.rollover_consumed_amount > 0 %}
+              <small>Usado de bolsa {{ row.rollover_consumed_amount | money }}</small>
+            {% else %}
+              <small>Remanente anterior {{ row.opening_balance | money }}</small>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    <p class="surface-caption">La suma de bolsas virtuales mas libre no asignado es una lectura interna del saldo bancario. No cuenta como ahorro movido ni como colchon real.</p>
+  </article>
+</section>
+{% endblock %}

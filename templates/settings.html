@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Presupuesto base</p>
+        <h3>Configuracion inicial</h3>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('web.update_default_budget') }}" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <label>
+        <span>Nombre de la regla</span>
+        <input type="text" name="name" value="{{ default_budget_rule.name }}">
+      </label>
+
+      <div class="form-grid">
+        <label>
+          <span>% inversion</span>
+          <input type="number" step="0.1" name="investment_percent" value="{{ default_budget_rule.investment_percent }}">
+        </label>
+        <label>
+          <span>% reinversión</span>
+          <input type="number" step="0.1" name="reinvestment_percent" value="{{ default_budget_rule.reinvestment_percent }}">
+        </label>
+        <label>
+          <span>% ahorro automatico</span>
+          <input type="number" step="0.1" name="savings_percent" value="{{ default_budget_rule.savings_percent }}">
+        </label>
+        <label>
+          <span>% variable general</span>
+          <input type="number" step="0.1" name="lifestyle_percent" value="{{ default_budget_rule.lifestyle_percent }}">
+        </label>
+        <label>
+          <span>% excepcionales</span>
+          <input type="number" step="0.1" name="exceptional_percent" value="{{ default_budget_rule.exceptional_percent }}">
+        </label>
+        <label>
+          <span>Dias trabajados por defecto</span>
+          <input type="number" step="1" name="estimated_workdays" value="{{ default_budget_rule.estimated_workdays }}">
+        </label>
+      </div>
+
+      <label>
+        <span>Notas</span>
+        <textarea name="notes" rows="3">{{ default_budget_rule.notes or '' }}</textarea>
+      </label>
+
+      <button type="submit" class="primary-button">Guardar configuracion base</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Sistema</p>
+        <h3>Estado y seguridad</h3>
+      </div>
+    </div>
+    <ul class="status-list">
+      <li><span>Cookie segura</span><strong>{{ "Si" if stats.session_cookie_secure else "No" }}</strong></li>
+      <li><span>Secret key por defecto</span><strong>{{ "Si" if stats.secret_key_default else "No" }}</strong></li>
+      <li><span>Base de datos</span><strong>{{ stats.database_path }}</strong></li>
+      <li><span>Subidas</span><strong>{{ stats.uploads_dir }}</strong></li>
+      <li><span>Backups</span><strong>{{ stats.backups_dir }}</strong></li>
+    </ul>
+
+    <form method="post" action="{{ url_for('web.backup') }}" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="primary-button">Crear backup SQLite</button>
+    </form>
+
+    <a href="{{ url_for('web.export_summary') }}" class="ghost-button full-width">Exportar resumen CSV</a>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Inicio oficial</p>
+        <h3>Baseline del historico</h3>
+      </div>
+      <a href="{{ url_for('web.history') }}" class="text-link">Ver historico</a>
+    </div>
+
+    <form method="post" action="{{ url_for('web.update_baseline') }}" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ url_for('web.settings') }}">
+
+      <label>
+        <span>Ver datos desde</span>
+        <input type="date" name="baseline_date" value="{{ reporting_baseline_date }}" required>
+      </label>
+
+      <p class="muted-copy">Esto solo cambia la lectura del historico y los acumulados visibles. No borra movimientos, importaciones ni snapshots anteriores.</p>
+      <button type="submit" class="primary-button">Guardar inicio oficial</button>
+    </form>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Plan de inversion</p>
+        <h3>Estrategia objetivo</h3>
+      </div>
+      <a href="{{ url_for('web.investment_plan') }}" class="text-link">Abrir plan</a>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Activos activos</span>
+        <strong>{{ investment_plan_overview.count_active }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Suma del plan</span>
+        <strong>{{ investment_plan_overview.total_target_percent }}%</strong>
+      </div>
+    </div>
+
+    <p class="muted-copy">Desde aqui puedes saltar a la pantalla donde defines tu cartera objetivo y comparas esa estrategia con la cartera real importada.</p>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Acceso</p>
+        <h3>Cambiar contrasena</h3>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('web.update_password') }}" class="stacked-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <label>
+        <span>Contrasena actual</span>
+        <input type="password" name="current_password" required>
+      </label>
+
+      <label>
+        <span>Nueva contrasena</span>
+        <input type="password" name="new_password" minlength="10" required>
+      </label>
+
+      <button type="submit" class="primary-button">Actualizar contrasena</button>
+    </form>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Backups</p>
+        <h3>Copias disponibles</h3>
+      </div>
+    </div>
+    <div class="timeline-list">
+      {% for backup_file in backup_files %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ backup_file.name }}</strong>
+            <p>{{ backup_file.size }} bytes</p>
+          </div>
+          <a href="{{ url_for('web.download_backup', filename=backup_file.name) }}" class="text-link">Descargar</a>
+        </article>
+      {% else %}
+        <p class="muted-copy">Todavia no hay backups guardados.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Actividad</p>
+        <h3>Ultimas importaciones</h3>
+      </div>
+    </div>
+    <div class="timeline-list">
+      {% for job in recent_imports %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ SOURCE_LABELS[job.source] }}</strong>
+            <p>{{ job.filename }}</p>
+          </div>
+          <div class="timeline-meta">
+            <span class="tag {{ job.status }}">{{ job.status }}</span>
+            <small>{{ job.imported_at | compact_date }}</small>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

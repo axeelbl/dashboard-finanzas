@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="toolbar-card">
+  <form method="get" class="inline-form inline-form-end">
+    <label>
+      <span>Mes</span>
+      <select name="month" onchange="this.form.submit()">
+        {% for option in month_options %}
+          <option value="{{ option.value }}" {% if option.value == selected_month %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="hero-grid hero-grid-bank">
+  <article class="hero-card hero-card-main">
+    <p class="eyebrow">Colchon real</p>
+    <h3>{{ savings.real_cushion | money }}</h3>
+    <p class="hero-meta">
+      Reservado en {{ savings.real_cushion_source }}{% if savings.real_cushion_snapshot_date %} desde {{ savings.real_cushion_snapshot_date | compact_date }}{% endif %}. Sobrante pendiente del mes: <strong>{{ savings.pending_assignment | money }}</strong>
+      <span class="tag {{ savings.status_tone }}">{{ savings.status_label }}</span>
+    </p>
+
+    <div class="hero-inline-grid">
+      <div>
+        <span class="eyebrow">Metido en ahorro</span>
+        <strong>{{ savings.reserve_principal | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Ahora tienes</span>
+        <strong>{{ savings.reserve_current_amount | money }}</strong>
+      </div>
+      <div>
+        <span class="eyebrow">Aporta el 2%</span>
+        <strong class="{% if savings.reserve_interest_net >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ savings.reserve_interest_net | money }}</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="metric-card">
+    <p>Metido en ahorro</p>
+    <strong>{{ savings.reserve_principal | money }}</strong>
+    <span>Base sin intereses del 2%</span>
+  </article>
+
+  <article class="metric-card">
+    <p>Ganado por el 2%</p>
+    <strong class="{% if savings.reserve_interest_net >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ savings.reserve_interest_net | money }}</strong>
+    <span>{% if savings.reserve_interest_percent is not none %}{{ savings.reserve_interest_percent }}% acumulado sobre la base actual{% else %}Sin porcentaje{% endif %}</span>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card panel-card-wide">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Trade Republic 2%</p>
+        <h3>Lo que has metido vs lo que tienes</h3>
+      </div>
+      <span class="tag muted">{{ savings.real_cushion_snapshot_date | compact_date }}</span>
+    </div>
+
+    <div class="stat-chip-row stat-chip-row-two">
+      <div class="stat-chip">
+        <span>Dinero metido en ahorro</span>
+        <strong>{{ savings.reserve_principal | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Dinero actual</span>
+        <strong>{{ savings.reserve_current_amount | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Diferencia 2%</span>
+        <strong class="{% if savings.reserve_interest_net >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ savings.reserve_interest_net | money }}</strong>
+      </div>
+      <div class="stat-chip">
+        <span>Rentabilidad acumulada</span>
+        <strong>{% if savings.reserve_interest_percent is not none %}{{ savings.reserve_interest_percent }}%{% else %}N/D{% endif %}</strong>
+      </div>
+    </div>
+
+    <div class="surface-note">
+      <p><strong>Lectura.</strong> La diferencia se calcula con los intereses netos registrados en Trade Republic. Asi ves cuanto esta aportando el 2% sobre el colchon que sigue en efectivo.</p>
+      <p class="muted-copy">Movimientos usados: aportaciones {{ savings.reserve_external_inflows | money }}, compras de inversion {{ savings.reserve_investment_buys | money }}, ventas {{ savings.reserve_investment_sells | money }}{% if savings.reserve_dividend_income %}, dividendos {{ savings.reserve_dividend_income | money }}{% endif %}.</p>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Historico mensual</p>
+        <h3>Ahorro automatico, movido y sobrante</h3>
+      </div>
+    </div>
+
+    <canvas class="chart-canvas line-chart" data-chart-type="line" data-chart='{{ history_chart | tojson }}'></canvas>
+    <p class="surface-caption">El sobrante del mes queda pendiente de asignar. Solo el dinero reservado de verdad cuenta como colchon real.</p>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Mes a mes</p>
+        <h3>Sobrante pendiente por mes</h3>
+      </div>
+    </div>
+
+    <div class="mini-list">
+      {% for row in history_rows %}
+        <article class="mini-list-item">
+          <div class="text-stack">
+            <strong>{{ row.label }}</strong>
+            <p>Automatico {{ row.automatic_target_amount | money }} · Movido {{ row.moved_amount | money }}</p>
+          </div>
+          <div class="mini-list-side">
+            <strong class="{% if row.closing_amount >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ row.closing_amount | money }}</strong>
+            <small>{{ row.status_label }}</small>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>Sin historico de ahorro</strong>
+          <p>Cuando vayas registrando meses veremos aqui el objetivo automatico, lo movido y el sobrante pendiente.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="split-grid">
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Lectura rapida</p>
+        <h3>Como interpretar este mes</h3>
+      </div>
+    </div>
+
+    <div class="insight-list">
+      <article class="insight-row">
+        <div class="text-stack">
+          <strong>Ahorro automatico / planificado</strong>
+          <p>Lo que decides reservar este mes segun tu presupuesto actual.</p>
+        </div>
+        <div class="insight-metrics">
+          <strong>{{ savings.automatic_target | money }}</strong>
+          <small>Meta mensual</small>
+        </div>
+      </article>
+
+      <article class="insight-row">
+        <div class="text-stack">
+          <strong>Ahorro movido</strong>
+          <p>Dinero que si ha quedado reflejado en movimientos clasificados como ahorro.</p>
+        </div>
+        <div class="insight-metrics">
+          <strong>{{ savings.moved_actual | money }}</strong>
+          <small>{{ savings.progreso_ahorro_automatico }}% del objetivo automatico</small>
+        </div>
+      </article>
+
+      <article class="insight-row">
+        <div class="text-stack">
+          <strong>Sobrante del mes</strong>
+          <p>Dinero libre que queda pendiente de asignar tras gastos, inversion, reinversion y ahorro movido.</p>
+        </div>
+        <div class="insight-metrics">
+          <strong class="{% if savings.pending_assignment >= 0 %}value-positive{% else %}value-negative{% endif %}">{{ savings.pending_assignment | money }}</strong>
+          <small>{{ savings.status_label }}</small>
+        </div>
+      </article>
+
+      <article class="insight-row">
+        <div class="text-stack">
+          <strong>Colchon real</strong>
+          <p>Dinero realmente reservado. Ahora se toma del efectivo en Trade Republic.</p>
+        </div>
+        <div class="insight-metrics">
+          <strong>{{ savings.real_cushion | money }}</strong>
+          <small>{% if savings.buffer_months is not none %}{{ savings.buffer_months }} meses de colchon{% else %}Colchon sin referencia{% endif %}</small>
+        </div>
+      </article>
+    </div>
+
+    <div class="surface-note">
+      <p><strong>{{ savings.status_label }}.</strong> {{ savings.comparison_copy }}</p>
+      <p class="muted-copy">{{ savings.closing_hint }}</p>
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Movimientos</p>
+        <h3>Ahorro movido por transacciones</h3>
+      </div>
+    </div>
+
+    <div class="timeline-list">
+      {% for row in recent_transactions %}
+        <article class="timeline-item">
+          <div>
+            <strong>{{ row.description }}</strong>
+            <p>{{ row.transaction_date | compact_date }}</p>
+          </div>
+          <div class="timeline-meta">
+            <strong>{{ row.amount | money }}</strong>
+            <small>{{ row.review_status }}</small>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>No hay ahorro movido este mes</strong>
+          <p>El sobrante pendiente no se consolida solo como colchon real.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

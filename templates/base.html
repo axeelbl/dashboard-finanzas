@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title or "Dashboard" }} | {{ config.APP_TITLE }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('favicon') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="{% if hide_chrome %}auth-page{% else %}app-page{% endif %}">
+  {% if not hide_chrome %}
+    <aside class="sidebar">
+      <div class="brand-block">
+        <span class="brand-mark">DF</span>
+        <div>
+          <p class="eyebrow">Finanzas personales</p>
+          <h1>{{ config.APP_TITLE }}</h1>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="{{ url_for('web.dashboard') }}" class="{% if request.path.startswith('/resumen') %}active{% endif %}">Resumen</a>
+        <a href="{{ url_for('web.budget') }}" class="{% if request.path.startswith('/presupuesto') %}active{% endif %}">Presupuesto mensual</a>
+        <a href="{{ url_for('web.bank') }}" class="{% if request.path == url_for('web.bank') %}active{% endif %}">Movimientos banco</a>
+        <a href="{{ url_for('web.bank_subbalances') }}" class="{% if request.path.startswith('/banco/bolsas') %}active{% endif %}">Bolsas banco</a>
+        <a href="{{ url_for('web.cash') }}" class="{% if request.path.startswith('/efectivo') %}active{% endif %}">Efectivo</a>
+        <a href="{{ url_for('web.investments') }}" class="{% if request.path.startswith('/inversiones') or request.path.startswith('/trade-republic') or request.path.startswith('/binance') %}active{% endif %}">Inversiones</a>
+        <a href="{{ url_for('web.savings') }}" class="{% if request.path.startswith('/ahorro') %}active{% endif %}">Ahorro</a>
+        <a href="{{ url_for('web.fixed_expenses') }}" class="{% if request.path.startswith('/gastos-fijos') %}active{% endif %}">Gastos fijos</a>
+        <a href="{{ url_for('web.history') }}" class="{% if request.path.startswith('/historico') %}active{% endif %}">Historico</a>
+        <a href="{{ url_for('web.import_data') }}" class="{% if request.path.startswith('/importar') %}active{% endif %}">Importaciones</a>
+        <a href="{{ url_for('web.settings') }}" class="{% if request.path.startswith('/configuracion') %}active{% endif %}">Configuracion</a>
+      </nav>
+
+      <div class="sidebar-subnav">
+        <p class="eyebrow">Fuentes de cartera</p>
+        <a href="{{ url_for('web.trade_republic') }}" class="{% if request.path.startswith('/trade-republic') %}active-sub{% endif %}">Trade Republic</a>
+        <a href="{{ url_for('web.binance') }}" class="{% if request.path.startswith('/binance') %}active-sub{% endif %}">Binance</a>
+      </div>
+
+      <div class="sidebar-footer">
+        <form method="post" action="{{ url_for('web.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="ghost-button full-width">Cerrar sesion</button>
+        </form>
+      </div>
+    </aside>
+  {% endif %}
+
+  <main class="main-shell {% if hide_chrome %}main-shell-auth{% endif %}">
+    {% if not hide_chrome %}
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Control financiero</p>
+          <h2>{{ page_title }}</h2>
+        </div>
+        <div class="user-pill">
+          <span>Usuario</span>
+          <strong>{{ current_user.username }}</strong>
+        </div>
+      </header>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <section class="flash-stack">
+          {% for category, message in messages %}
+            <article class="flash flash-{{ category }}">{{ message }}</article>
+          {% endfor %}
+        </section>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
